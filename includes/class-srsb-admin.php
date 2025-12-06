@@ -9,6 +9,8 @@ class SRSB_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'register_menus' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'wp_ajax_srsb_test_ai', array( $this, 'ajax_test_ai' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 	}
 
 	public function register_menus() {
@@ -194,6 +196,30 @@ class SRSB_Admin {
 		$value = get_option( 'simreact_brand_default_cta', 'Request a Diagnostic' );
 		echo '<input type="text" name="simreact_brand_default_cta" value="' . esc_attr( $value ) . '" class="regular-text" />';
 		echo '<p class="description">' . esc_html__( 'Default call-to-action text for patterns.', 'simreact-site-builder' ) . '</p>';
+	}
+
+	public function ajax_test_ai() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
+		}
+
+		$result = SRSB_AI::chat( __( 'Respond with: AI Test Successful', 'simreact-site-builder' ) );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( $result->get_error_message() );
+		} else {
+			wp_send_json_success( $result );
+		}
+	}
+
+	public function enqueue_admin_assets() {
+		wp_enqueue_script(
+			'srsb-admin-js',
+			SRSB_PLUGIN_URL . 'assets/js/admin.js',
+			array( 'jquery' ),
+			SRSB_VERSION,
+			true
+		);
 	}
 
 }

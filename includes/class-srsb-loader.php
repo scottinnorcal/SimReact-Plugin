@@ -18,6 +18,7 @@ class SRSB_Loader {
 			'class-srsb-admin.php',
 			'class-srsb-settings.php',
 			'class-srsb-generator.php',
+			'class-srsb-ai.php',
 		);
 		foreach ( $classes as $class ) {
 			require_once SRSB_PLUGIN_DIR . 'includes/' . $class;
