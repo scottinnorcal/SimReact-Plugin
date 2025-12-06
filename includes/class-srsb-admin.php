@@ -10,6 +10,7 @@ class SRSB_Admin {
 		add_action( 'admin_menu', array( $this, 'register_menus' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'wp_ajax_srsb_test_ai', array( $this, 'ajax_test_ai' ) );
+		add_action( 'wp_ajax_srsb_generate_ai_copy', array( $this, 'ajax_generate_ai_copy' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 	}
 
@@ -204,6 +205,29 @@ class SRSB_Admin {
 		}
 
 		$result = SRSB_AI::chat( __( 'Respond with: AI Test Successful', 'simreact-site-builder' ) );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( $result->get_error_message() );
+		} else {
+			wp_send_json_success( $result );
+		}
+	}
+
+	public function ajax_generate_ai_copy() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
+		}
+
+		$prompt  = sanitize_text_field( $_POST['prompt'] ?? '' );
+		$section = sanitize_text_field( $_POST['section'] ?? '' );
+
+		if ( empty( $prompt ) || empty( $section ) ) {
+			wp_send_json_error( __( 'Missing section or prompt.', 'simreact-site-builder' ) );
+		}
+
+		$full_prompt = "Write copy for the SimReact website section: {$section}. The purpose of this section: {$prompt}. Respond with only text, no markdown.";
+
+		$result = SRSB_AI::chat( $full_prompt );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result->get_error_message() );

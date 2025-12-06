@@ -9,6 +9,33 @@ if ( ! defined( 'WPINC' ) ) {
 	<h1><?php esc_html_e( 'SimReact Page Builder', 'simreact-site-builder' ); ?></h1>
 	<p><?php esc_html_e( 'Generate structured pages using predefined SimReact templates.', 'simreact-site-builder' ); ?></p>
 
+	<hr>
+
+	<h2><?php esc_html_e( 'AI Copy Generator (Optional)', 'simreact-site-builder' ); ?></h2>
+	<p><?php esc_html_e( 'Use AI to generate custom copy for specific sections before building the page.', 'simreact-site-builder' ); ?></p>
+
+	<fieldset class="srsb-ai-generator">
+		<label for="srsb_ai_section"><?php esc_html_e( 'Choose Section to Generate Copy For:', 'simreact-site-builder' ); ?></label>
+		<select name="srsb_ai_section" id="srsb_ai_section">
+			<option value=""><?php esc_html_e( 'Do not use AI', 'simreact-site-builder' ); ?></option>
+			<option value="hero-main"><?php esc_html_e( 'Hero – Main', 'simreact-site-builder' ); ?></option>
+			<option value="hero-product"><?php esc_html_e( 'Hero – Product', 'simreact-site-builder' ); ?></option>
+			<option value="feature-grid-core"><?php esc_html_e( 'Feature Grid – Core', 'simreact-site-builder' ); ?></option>
+			<option value="workflow-timeline"><?php esc_html_e( 'Workflow Timeline', 'simreact-site-builder' ); ?></option>
+			<option value="output-gallery"><?php esc_html_e( 'Output Gallery', 'simreact-site-builder' ); ?></option>
+			<option value="testimonial-strip"><?php esc_html_e( 'Testimonials', 'simreact-site-builder' ); ?></option>
+			<option value="faq-basic"><?php esc_html_e( 'FAQ Section', 'simreact-site-builder' ); ?></option>
+		</select>
+
+		<textarea name="srsb_ai_prompt" id="srsb_ai_prompt" rows="4" class="large-text" placeholder="<?php esc_attr_e( 'Describe what you want the AI to write. Example: \'Rewrite the hero to highlight SimReact as a structural intelligence engine for creators.\'', 'simreact-site-builder' ); ?>"></textarea>
+
+		<button type="button" class="button" id="srsb-ai-generate-button"><?php esc_html_e( 'Generate Copy', 'simreact-site-builder' ); ?></button>
+
+		<div id="srsb-ai-generation-output" style="margin-top:10px;"></div>
+	</fieldset>
+
+	<hr>
+
 	<form method="post">
 		<?php wp_nonce_field( 'srsb_generate_page', 'srsb_generate_page_nonce' ); ?>
 
