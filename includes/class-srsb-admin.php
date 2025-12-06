@@ -8,6 +8,7 @@ class SRSB_Admin {
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'register_menus' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
 	}
 
 	public function register_menus() {
@@ -83,7 +84,116 @@ class SRSB_Admin {
 	}
 
 	public function render_settings_page() {
-		echo '<div class="wrap"><h1>' . esc_html__( 'SimReact Settings', 'simreact-site-builder' ) . '</h1><p>' . esc_html__( 'Settings UI coming in a later phase.', 'simreact-site-builder' ) . '</p></div>';
+		include_once SRSB_PLUGIN_DIR . 'admin/views/page-settings.php';
+	}
+
+	public function register_settings() {
+		register_setting(
+			'simreact_site_builder_options',
+			'simreact_ai_api_key',
+			array( 'sanitize_callback' => 'sanitize_text_field' )
+		);
+
+		register_setting(
+			'simreact_site_builder_options',
+			'simreact_brand_primary_color',
+			array( 'sanitize_callback' => 'sanitize_hex_color' )
+		);
+
+		register_setting(
+			'simreact_site_builder_options',
+			'simreact_brand_secondary_color',
+			array( 'sanitize_callback' => 'sanitize_hex_color' )
+		);
+
+		register_setting(
+			'simreact_site_builder_options',
+			'simreact_brand_accent_color',
+			array( 'sanitize_callback' => 'sanitize_hex_color' )
+		);
+
+		register_setting(
+			'simreact_site_builder_options',
+			'simreact_brand_default_cta',
+			array( 'sanitize_callback' => 'sanitize_text_field' )
+		);
+
+		add_settings_section(
+			'simreact_site_builder_general',
+			__( 'SimReact Brand Settings', 'simreact-site-builder' ),
+			null,
+			'simreact_site_builder_settings'
+		);
+
+		add_settings_field(
+			'simreact_ai_api_key',
+			__( 'OpenRouter API Key', 'simreact-site-builder' ),
+			array( $this, 'render_api_key_field' ),
+			'simreact_site_builder_settings',
+			'simreact_site_builder_general'
+		);
+
+		add_settings_field(
+			'simreact_brand_primary_color',
+			__( 'Primary Color', 'simreact-site-builder' ),
+			array( $this, 'render_primary_color_field' ),
+			'simreact_site_builder_settings',
+			'simreact_site_builder_general'
+		);
+
+		add_settings_field(
+			'simreact_brand_secondary_color',
+			__( 'Secondary Color', 'simreact-site-builder' ),
+			array( $this, 'render_secondary_color_field' ),
+			'simreact_site_builder_settings',
+			'simreact_site_builder_general'
+		);
+
+		add_settings_field(
+			'simreact_brand_accent_color',
+			__( 'Accent Color', 'simreact-site-builder' ),
+			array( $this, 'render_accent_color_field' ),
+			'simreact_site_builder_settings',
+			'simreact_site_builder_general'
+		);
+
+		add_settings_field(
+			'simreact_brand_default_cta',
+			__( 'Default CTA Text', 'simreact-site-builder' ),
+			array( $this, 'render_default_cta_field' ),
+			'simreact_site_builder_settings',
+			'simreact_site_builder_general'
+		);
+	}
+
+	public function render_api_key_field() {
+		$value = get_option( 'simreact_ai_api_key', '' );
+		echo '<input type="text" name="simreact_ai_api_key" value="' . esc_attr( $value ) . '" class="regular-text" />';
+		echo '<p class="description">' . esc_html__( 'Enter your OpenRouter API key for AI features.', 'simreact-site-builder' ) . '</p>';
+	}
+
+	public function render_primary_color_field() {
+		$value = get_option( 'simreact_brand_primary_color', '#000000' );
+		echo '<input type="text" name="simreact_brand_primary_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
+		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #1A202C', 'simreact-site-builder' ) . '</p>';
+	}
+
+	public function render_secondary_color_field() {
+		$value = get_option( 'simreact_brand_secondary_color', '#ffffff' );
+		echo '<input type="text" name="simreact_brand_secondary_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
+		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #6B7280', 'simreact-site-builder' ) . '</p>';
+	}
+
+	public function render_accent_color_field() {
+		$value = get_option( 'simreact_brand_accent_color', '#007bff' );
+		echo '<input type="text" name="simreact_brand_accent_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
+		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #0056B3', 'simreact-site-builder' ) . '</p>';
+	}
+
+	public function render_default_cta_field() {
+		$value = get_option( 'simreact_brand_default_cta', 'Request a Diagnostic' );
+		echo '<input type="text" name="simreact_brand_default_cta" value="' . esc_attr( $value ) . '" class="regular-text" />';
+		echo '<p class="description">' . esc_html__( 'Default call-to-action text for patterns.', 'simreact-site-builder' ) . '</p>';
 	}
 
 }
