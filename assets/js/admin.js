@@ -22,7 +22,7 @@ jQuery(document).ready(function($){
     $('#srsb-ai-generate-button').on('click', function(e){
         e.preventDefault();
 
-        const prompt = $('#srsb_ai_prompt').val();
+        const prompt  = $('#srsb_ai_prompt').val();
         const section = $('#srsb_ai_section').val();
 
         if (!prompt || !section) {

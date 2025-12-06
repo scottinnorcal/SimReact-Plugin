@@ -1,249 +1,292 @@
 <?php
 
 if ( ! defined( 'WPINC' ) ) {
-	die;
+    die;
 }
 
 class SRSB_Admin {
 
-	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menus' ) );
-		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'wp_ajax_srsb_test_ai', array( $this, 'ajax_test_ai' ) );
-		add_action( 'wp_ajax_srsb_generate_ai_copy', array( $this, 'ajax_generate_ai_copy' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
-	}
+    public function __construct() {
+        add_action( 'admin_menu', array( $this, 'register_menus' ) );
+        add_action( 'admin_init', array( $this, 'register_settings' ) );
+        add_action( 'wp_ajax_srsb_test_ai', array( $this, 'ajax_test_ai' ) );
+        add_action( 'wp_ajax_srsb_generate_ai_copy', array( $this, 'ajax_generate_ai_copy' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+    }
 
-	public function register_menus() {
-		add_menu_page(
-			__( 'SimReact Page Builder', 'simreact-site-builder' ),
-			__( 'SimReact Builder', 'simreact-site-builder' ),
-			'manage_options',
-			'simreact-builder',
-			array( $this, 'render_builder_page' ),
-			'dashicons-welcome-add-page',
-			20
-		);
+    public function register_menus() {
+        add_menu_page(
+            __( 'SimReact Builder', 'simreact-site-builder' ),
+            __( 'SimReact Builder', 'simreact-site-builder' ),
+            'manage_options',
+            'simreact-builder',
+            array( $this, 'render_builder_page' ),
+            'dashicons-layout',
+            58
+        );
 
-		add_submenu_page(
-			'simreact-builder',
-			__( 'SimReact Settings', 'simreact-site-builder' ),
-			__( 'Settings', 'simreact-site-builder' ),
-			'manage_options',
-			'simreact-builder-settings',
-			array( $this, 'render_settings_page' )
-		);
-	}
+        add_submenu_page(
+            'simreact-builder',
+            __( 'SimReact Settings', 'simreact-site-builder' ),
+            __( 'Settings', 'simreact-site-builder' ),
+            'manage_options',
+            'simreact-builder-settings',
+            array( $this, 'render_settings_page' )
+        );
+    }
 
-	public function render_builder_page() {
-		if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['srsb_generate_page_nonce'] ) ) {
-			$this->handle_form_submission();
-		}
+    public function render_builder_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
 
-		include_once SRSB_PLUGIN_DIR . 'admin/views/page-builder-dashboard.php';
-	}
+        // Handle page generation form submission.
+        if ( isset( $_POST['srsb_generate_page_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['srsb_generate_page_nonce'] ) ), 'srsb_generate_page' ) ) {
+            $template_id       = isset( $_POST['srsb_template_id'] ) ? sanitize_text_field( wp_unslash( $_POST['srsb_template_id'] ) ) : '';
+            $page_title        = isset( $_POST['srsb_page_title'] ) ? sanitize_text_field( wp_unslash( $_POST['srsb_page_title'] ) ) : '';
+            $page_slug_input   = isset( $_POST['srsb_page_slug'] ) ? sanitize_text_field( wp_unslash( $_POST['srsb_page_slug'] ) ) : '';
+            $set_as_front_page = ! empty( $_POST['srsb_set_as_front_page'] );
 
-	private function handle_form_submission() {
-		if ( ! wp_verify_nonce( $_POST['srsb_generate_page_nonce'], 'srsb_generate_page' ) ) {
-			wp_die( __( 'Security check failed.', 'simreact-site-builder' ) );
-		}
+            if ( empty( $template_id ) || empty( $page_title ) ) {
+                add_settings_error(
+                    'srsb_builder',
+                    'srsb_builder_missing_fields',
+                    __( 'Please select a template and enter a page title.', 'simreact-site-builder' ),
+                    'error'
+                );
+            } else {
+                $args = array(
+                    'post_title'        => $page_title,
+                    'post_name'         => $page_slug_input ? sanitize_title( $page_slug_input ) : '',
+                    'post_status'       => 'publish',
+                    'post_type'         => 'page',
+                    'set_as_front_page' => $set_as_front_page,
+                );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( __( 'You do not have permission to perform this action.', 'simreact-site-builder' ) );
-		}
+                $result = SRSB_Generator::generate_page_from_template( $template_id, $args );
 
-		$template_id = sanitize_text_field( $_POST['srsb_template_id'] ?? '' );
-		$page_title  = sanitize_text_field( $_POST['srsb_page_title'] ?? '' );
-		$page_slug   = sanitize_title( $_POST['srsb_page_slug'] ?? '' );
-		$set_as_front_page = ! empty( $_POST['srsb_set_as_front_page'] );
+                if ( is_wp_error( $result ) ) {
+                    add_settings_error(
+                        'srsb_builder',
+                        'srsb_builder_error',
+                        $result->get_error_message(),
+                        'error'
+                    );
+                } else {
+                    $edit_link = get_edit_post_link( $result );
+                    $view_link = get_permalink( $result );
 
-		if ( empty( $template_id ) || empty( $page_title ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . __( 'Template and page title are required.', 'simreact-site-builder' ) . '</p></div>';
-			return;
-		}
+                    $message = sprintf(
+                        /* translators: 1: edit link, 2: view link */
+                        __( 'Page created successfully. <a href="%1$s">Edit Page</a> | <a href="%2$s" target="_blank">View Page</a>', 'simreact-site-builder' ),
+                        esc_url( $edit_link ),
+                        esc_url( $view_link )
+                    );
 
-		$args = array(
-			'post_title'       => $page_title,
-			'post_name'        => $page_slug ?: null,
-			'post_status'      => 'publish',
-			'post_type'        => 'page',
-			'set_as_front_page' => $set_as_front_page,
-		);
+                    add_settings_error(
+                        'srsb_builder',
+                        'srsb_builder_success',
+                        $message,
+                        'updated'
+                    );
+                }
+            }
+        }
 
-		$result = SRSB_Generator::generate_page_from_template( $template_id, $args );
+        settings_errors( 'srsb_builder' );
 
-		if ( is_wp_error( $result ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>';
-		} else {
-			$edit_link = get_edit_post_link( $result );
-			$view_link = get_permalink( $result );
-			$message = sprintf(
-				__( 'Page created successfully. <a href="%1$s">Edit Page</a> | <a href="%2$s" target="_blank">View Page</a>', 'simreact-site-builder' ),
-				esc_url( $edit_link ),
-				esc_url( $view_link )
-			);
-			echo '<div class="notice notice-success is-dismissible"><p>' . $message . '</p></div>';
-		}
-	}
+        include SRSB_PLUGIN_DIR . 'admin/views/page-builder-dashboard.php';
+    }
 
-	public function render_settings_page() {
-		include_once SRSB_PLUGIN_DIR . 'admin/views/page-settings.php';
-	}
+    public function render_settings_page() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
 
-	public function register_settings() {
-		register_setting(
-			'simreact_site_builder_options',
-			'simreact_ai_api_key',
-			array( 'sanitize_callback' => 'sanitize_text_field' )
-		);
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'SimReact Settings', 'simreact-site-builder' ); ?></h1>
+            <form method="post" action="options.php">
+                <?php
+                    settings_fields( 'simreact_site_builder_options' );
+                    do_settings_sections( 'simreact_site_builder_settings' );
+                    submit_button();
+                ?>
+            </form>
+        </div>
+        <?php
+    }
 
-		register_setting(
-			'simreact_site_builder_options',
-			'simreact_brand_primary_color',
-			array( 'sanitize_callback' => 'sanitize_hex_color' )
-		);
+    public function register_settings() {
+        register_setting(
+            'simreact_site_builder_options',
+            'simreact_ai_api_key',
+            array( 'sanitize_callback' => 'sanitize_text_field' )
+        );
 
-		register_setting(
-			'simreact_site_builder_options',
-			'simreact_brand_secondary_color',
-			array( 'sanitize_callback' => 'sanitize_hex_color' )
-		);
+        register_setting(
+            'simreact_site_builder_options',
+            'simreact_brand_primary_color',
+            array( 'sanitize_callback' => 'sanitize_hex_color' )
+        );
 
-		register_setting(
-			'simreact_site_builder_options',
-			'simreact_brand_accent_color',
-			array( 'sanitize_callback' => 'sanitize_hex_color' )
-		);
+        register_setting(
+            'simreact_site_builder_options',
+            'simreact_brand_secondary_color',
+            array( 'sanitize_callback' => 'sanitize_hex_color' )
+        );
 
-		register_setting(
-			'simreact_site_builder_options',
-			'simreact_brand_default_cta',
-			array( 'sanitize_callback' => 'sanitize_text_field' )
-		);
+        register_setting(
+            'simreact_site_builder_options',
+            'simreact_brand_accent_color',
+            array( 'sanitize_callback' => 'sanitize_hex_color' )
+        );
 
-		add_settings_section(
-			'simreact_site_builder_general',
-			__( 'SimReact Brand Settings', 'simreact-site-builder' ),
-			null,
-			'simreact_site_builder_settings'
-		);
+        register_setting(
+            'simreact_site_builder_options',
+            'simreact_brand_default_cta',
+            array( 'sanitize_callback' => 'sanitize_text_field' )
+        );
 
-		add_settings_field(
-			'simreact_ai_api_key',
-			__( 'OpenRouter API Key', 'simreact-site-builder' ),
-			array( $this, 'render_api_key_field' ),
-			'simreact_site_builder_settings',
-			'simreact_site_builder_general'
-		);
+        add_settings_section(
+            'simreact_site_builder_general',
+            __( 'Brand Defaults', 'simreact-site-builder' ),
+            '__return_false',
+            'simreact_site_builder_settings'
+        );
 
-		add_settings_field(
-			'simreact_brand_primary_color',
-			__( 'Primary Color', 'simreact-site-builder' ),
-			array( $this, 'render_primary_color_field' ),
-			'simreact_site_builder_settings',
-			'simreact_site_builder_general'
-		);
+        add_settings_field(
+            'simreact_ai_api_key',
+            __( 'OpenRouter API Key', 'simreact-site-builder' ),
+            array( $this, 'field_ai_api_key' ),
+            'simreact_site_builder_settings',
+            'simreact_site_builder_general'
+        );
 
-		add_settings_field(
-			'simreact_brand_secondary_color',
-			__( 'Secondary Color', 'simreact-site-builder' ),
-			array( $this, 'render_secondary_color_field' ),
-			'simreact_site_builder_settings',
-			'simreact_site_builder_general'
-		);
+        add_settings_field(
+            'simreact_brand_primary_color',
+            __( 'Primary Color', 'simreact-site-builder' ),
+            array( $this, 'field_primary_color' ),
+            'simreact_site_builder_settings',
+            'simreact_site_builder_general'
+        );
 
-		add_settings_field(
-			'simreact_brand_accent_color',
-			__( 'Accent Color', 'simreact-site-builder' ),
-			array( $this, 'render_accent_color_field' ),
-			'simreact_site_builder_settings',
-			'simreact_site_builder_general'
-		);
+        add_settings_field(
+            'simreact_brand_secondary_color',
+            __( 'Secondary Color', 'simreact-site-builder' ),
+            array( $this, 'field_secondary_color' ),
+            'simreact_site_builder_settings',
+            'simreact_site_builder_general'
+        );
 
-		add_settings_field(
-			'simreact_brand_default_cta',
-			__( 'Default CTA Text', 'simreact-site-builder' ),
-			array( $this, 'render_default_cta_field' ),
-			'simreact_site_builder_settings',
-			'simreact_site_builder_general'
-		);
-	}
+        add_settings_field(
+            'simreact_brand_accent_color',
+            __( 'Accent Color', 'simreact-site-builder' ),
+            array( $this, 'field_accent_color' ),
+            'simreact_site_builder_settings',
+            'simreact_site_builder_general'
+        );
 
-	public function render_api_key_field() {
-		$value = get_option( 'simreact_ai_api_key', '' );
-		echo '<input type="text" name="simreact_ai_api_key" value="' . esc_attr( $value ) . '" class="regular-text" />';
-		echo '<p class="description">' . esc_html__( 'Enter your OpenRouter API key for AI features.', 'simreact-site-builder' ) . '</p>';
-	}
+        add_settings_field(
+            'simreact_brand_default_cta',
+            __( 'Default CTA Text', 'simreact-site-builder' ),
+            array( $this, 'field_default_cta' ),
+            'simreact_site_builder_settings',
+            'simreact_site_builder_general'
+        );
+    }
 
-	public function render_primary_color_field() {
-		$value = get_option( 'simreact_brand_primary_color', '#000000' );
-		echo '<input type="text" name="simreact_brand_primary_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
-		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #1A202C', 'simreact-site-builder' ) . '</p>';
-	}
+    public function field_ai_api_key() {
+        $value = get_option( 'simreact_ai_api_key', '' );
+        ?>
+        <input type="text" name="simreact_ai_api_key" value="<?php echo esc_attr( $value ); ?>" class="regular-text" />
+        <p class="description"><?php esc_html_e( 'Your OpenRouter API key for AI features.', 'simreact-site-builder' ); ?></p>
+        <?php
+    }
 
-	public function render_secondary_color_field() {
-		$value = get_option( 'simreact_brand_secondary_color', '#ffffff' );
-		echo '<input type="text" name="simreact_brand_secondary_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
-		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #6B7280', 'simreact-site-builder' ) . '</p>';
-	}
+    public function field_primary_color() {
+        $value = get_option( 'simreact_brand_primary_color', '#000000' );
+        ?>
+        <input type="text" name="simreact_brand_primary_color" value="<?php echo esc_attr( $value ); ?>" class="regular-text" />
+        <p class="description"><?php esc_html_e( 'Primary brand HEX color, e.g. #1A202C.', 'simreact-site-builder' ); ?></p>
+        <?php
+    }
 
-	public function render_accent_color_field() {
-		$value = get_option( 'simreact_brand_accent_color', '#007bff' );
-		echo '<input type="text" name="simreact_brand_accent_color" value="' . esc_attr( $value ) . '" class="regular-text" />';
-		echo '<p class="description">' . esc_html__( 'Enter a HEX color like #0056B3', 'simreact-site-builder' ) . '</p>';
-	}
+    public function field_secondary_color() {
+        $value = get_option( 'simreact_brand_secondary_color', '#666666' );
+        ?>
+        <input type="text" name="simreact_brand_secondary_color" value="<?php echo esc_attr( $value ); ?>" class="regular-text" />
+        <?php
+    }
 
-	public function render_default_cta_field() {
-		$value = get_option( 'simreact_brand_default_cta', 'Request a Diagnostic' );
-		echo '<input type="text" name="simreact_brand_default_cta" value="' . esc_attr( $value ) . '" class="regular-text" />';
-		echo '<p class="description">' . esc_html__( 'Default call-to-action text for patterns.', 'simreact-site-builder' ) . '</p>';
-	}
+    public function field_accent_color() {
+        $value = get_option( 'simreact_brand_accent_color', '#E53E3E' );
+        ?>
+        <input type="text" name="simreact_brand_accent_color" value="<?php echo esc_attr( $value ); ?>" class="regular-text" />
+        <?php
+    }
 
-	public function ajax_test_ai() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
-		}
+    public function field_default_cta() {
+        $value = get_option( 'simreact_brand_default_cta', __( 'Request a Specimen Scan', 'simreact-site-builder' ) );
+        ?>
+        <input type="text" name="simreact_brand_default_cta" value="<?php echo esc_attr( $value ); ?>" class="regular-text" />
+        <?php
+    }
 
-		$result = SRSB_AI::chat( __( 'Respond with: AI Test Successful', 'simreact-site-builder' ) );
+    public function ajax_test_ai() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
+        }
 
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( $result->get_error_message() );
-		} else {
-			wp_send_json_success( $result );
-		}
-	}
+        $result = SRSB_AI::chat( 'Respond with: AI Test Successful' );
 
-	public function ajax_generate_ai_copy() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
-		}
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
 
-		$prompt  = sanitize_text_field( $_POST['prompt'] ?? '' );
-		$section = sanitize_text_field( $_POST['section'] ?? '' );
+        wp_send_json_success( $result );
+    }
 
-		if ( empty( $prompt ) || empty( $section ) ) {
-			wp_send_json_error( __( 'Missing section or prompt.', 'simreact-site-builder' ) );
-		}
+    public function ajax_generate_ai_copy() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Unauthorized.', 'simreact-site-builder' ) );
+        }
 
-		$full_prompt = "Write copy for the SimReact website section: {$section}. The purpose of this section: {$prompt}. Respond with only text, no markdown.";
+        $prompt  = isset( $_POST['prompt'] ) ? sanitize_text_field( wp_unslash( $_POST['prompt'] ) ) : '';
+        $section = isset( $_POST['section'] ) ? sanitize_text_field( wp_unslash( $_POST['section'] ) ) : '';
 
-		$result = SRSB_AI::chat( $full_prompt );
+        if ( empty( $prompt ) || empty( $section ) ) {
+            wp_send_json_error( __( 'Missing section or prompt.', 'simreact-site-builder' ) );
+        }
 
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( $result->get_error_message() );
-		} else {
-			wp_send_json_success( $result );
-		}
-	}
+        $full_prompt = sprintf(
+            'Write marketing copy for the SimReact website section "%1$s". Purpose: %2$s. Respond with plain text only, no markdown or HTML.',
+            $section,
+            $prompt
+        );
 
-	public function enqueue_admin_assets() {
-		wp_enqueue_script(
-			'srsb-admin-js',
-			SRSB_PLUGIN_URL . 'assets/js/admin.js',
-			array( 'jquery' ),
-			SRSB_VERSION,
-			true
-		);
-	}
+        $result = SRSB_AI::chat( $full_prompt );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public function enqueue_admin_assets( $hook ) {
+        // Only enqueue on our plugin pages.
+        if ( false === strpos( $hook, 'simreact-builder' ) ) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'srsb-admin-js',
+            SRSB_PLUGIN_URL . 'assets/js/admin.js',
+            array( 'jquery' ),
+            SRSB_VERSION,
+            true
+        );
+    }
 
 }

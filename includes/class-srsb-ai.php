@@ -14,10 +14,16 @@ class SRSB_AI {
 		}
 
 		$body = array(
-			'model' => 'google/gemini-2.5-flash',
+			'model'    => 'google/gemini-2.5-flash',
 			'messages' => array(
-				array( 'role' => 'system', 'content' => 'You are a helpful assistant.' ),
-				array( 'role' => 'user', 'content' => $prompt ),
+				array(
+					'role'    => 'system',
+					'content' => 'You are a helpful assistant that writes clear, concise marketing copy for a WordPress site about SimReact, a structural analysis engine for YouTube videos.',
+				),
+				array(
+					'role'    => 'user',
+					'content' => $prompt,
+				),
 			),
 		);
 
@@ -37,13 +43,21 @@ class SRSB_AI {
 			return $response;
 		}
 
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			return new WP_Error(
+				'srsb_ai_http_error',
+				sprintf( __( 'AI HTTP error: %d', 'simreact-site-builder' ), $code )
+			);
+		}
+
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		$content = $data['choices'][0]['message']['content'] ?? '';
-
-		if ( empty( $content ) ) {
+		if ( ! is_array( $data ) || empty( $data['choices'][0]['message']['content'] ) ) {
 			return new WP_Error( 'srsb_ai_empty', __( 'AI returned no content.', 'simreact-site-builder' ) );
 		}
+
+		$content = $data['choices'][0]['message']['content'];
 
 		return $content;
 	}
