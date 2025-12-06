@@ -18,4 +18,4 @@ define( 'SRSB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once SRSB_PLUGIN_DIR . 'includes/class-srsb-loader.php';
 
-$plugin = new SRSB_Plugin();
+SRSB_Plugin::get_instance();

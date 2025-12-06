@@ -6,6 +6,12 @@ if ( ! defined( 'WPINC' ) ) {
 
 class SRSB_AI {
 
+	/**
+	 * Call OpenRouter (google/gemini-2.5-flash) with a simple chat-style prompt.
+	 *
+	 * @param string $prompt User prompt.
+	 * @return string|WP_Error
+	 */
 	public static function chat( $prompt ) {
 		$api_key = get_option( 'simreact_ai_api_key' );
 
@@ -47,7 +53,7 @@ class SRSB_AI {
 		if ( 200 !== $code ) {
 			return new WP_Error(
 				'srsb_ai_http_error',
-				sprintf( __( 'AI HTTP error: %d', 'simreact-site-builder' ), $code )
+				sprintf( __( 'AI HTTP error: %d', 'simreact-site-builder' ), (int) $code )
 			);
 		}
 
